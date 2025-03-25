@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rotating 3D Bust</title>
+    <!-- Three.js imports -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+    <!-- Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg-color: #0f0f12;
+            --surface-color: #16171d;
+            --primary-color: #7649fe;
+            --secondary-color: #ff4dba;
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --accent-color: #2de2e6;
+        }
+        
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            overflow-x: hidden;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            padding: 0;
+        }
+        
+        .hero {
+            height: 100vh;
+            width: 100%;
+            margin: 0;
+            display: flex;
+            position: relative;
+            background: linear-gradient(135deg, var(--surface-color) 0%, var(--bg-color) 100%);
+            overflow: hidden;
+        }
+        
+        .hero:before {
+            content: '';
+            position: absolute;
+            top: -10%;
+            left: -10%;
+            width: 120%;
+            height: 120%;
+            background: radial-gradient(circle at 30% 30%, rgba(118, 73, 254, 0.15), transparent 40%),
+                        radial-gradient(circle at 70% 70%, rgba(255, 77, 186, 0.1), transparent 40%);
+            z-index: 0;
+        }
+        
+        /* Text overlay gradient */
+        .hero-content:after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: -20%;
+            width: 40%;
+            height: 100%;
+            background: linear-gradient(to right, var(--bg-color), transparent);
+            z-index: -1;
+            pointer-events: none;
+        }
+        
+        .hero-content {
+            position: relative;
+            left: 0;
+            width: 60%;
+            padding: 6rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            z-index: 2; /* Higher z-index to overlay text on model */
+        }
+        
+        .hero-content h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 5rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.03em;
+            position: relative;
+            mix-blend-mode: lighten; /* Helps text stand out against dark backgrounds */
+        }
+        
+        .hero-content p {
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            line-height: 1.4;
+            max-width: 80%;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5); /* Text shadow to help readability */
+        }
+        
+        #canvas-container {
+            position: absolute;
+            right: 0;
+            width: 60%;
+            height: 100%;
+            z-index: 1;
+        }
+        
+        #canvas-container:after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, transparent 30%, var(--bg-color) 100%);
+            pointer-events: none;
+            z-index: 2;
+        }
+        
+        .scroll-indicator {
+            position: absolute;
+            bottom: 3rem;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--text-secondary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+        }
+        
+        .scroll-indicator span {
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .scroll-icon {
+            font-size: 1.5rem;
+            animation: float 2s infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(15px);
+            }
+        }
+        
+        .content {
+            width: 100%;
+            margin: 0;
+            padding: 8rem 6rem;
+            background: linear-gradient(180deg, var(--bg-color) 0%, var(--surface-color) 100%);
+            position: relative;
+        }
+        
+        .content:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 70% 30%, rgba(118, 73, 254, 0.1), transparent 40%),
+                        radial-gradient(circle at 30% 70%, rgba(255, 77, 186, 0.05), transparent 40%);
+            z-index: 0;
+        }
+        
+        .content-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .content h2 {
+            font-family: 'Syne', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 2.5rem;
+            color: var(--text-primary);
+            position: relative;
+            display: inline-block;
+        }
+        
+        .content h2:after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            width: 40%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border-radius: 2px;
+        }
+        
+        .content p {
+            font-size: 1.2rem;
+            line-height: 1.8;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            max-width: 800px;
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(15, 15, 18, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(118, 73, 254, 0.2);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            border-bottom-color: var(--secondary-color);
+            animation: spin 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        .loading-text {
+            font-size: 1.2rem;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+        
+        .error-message {
+            color: var(--secondary-color);
+            font-weight: 500;
+            margin: 20px;
+            text-align: center;
+            max-width: 80%;
+        }
+        
+        .progress-bar {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 3px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 1.5px;
+            overflow: hidden;
+            z-index: 10;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            transition: width 0.15s ease;
+        }
+        
+        /* Geometric shapes for abstract elements */
+        .shape {
+            position: absolute;
+            opacity: 0.2;
+            z-index: 0;
+        }
+        
+        .shape-1 {
+            top: 10%;
+            left: 5%;
+            width: 300px;
+            height: 300px;
+            border: 2px solid var(--accent-color);
+            border-radius: 50%;
+        }
+        
+        .shape-2 {
+            bottom: 10%;
+            right: 5%;
+            width: 200px;
+            height: 200px;
+            background-color: var(--primary-color);
+            filter: blur(100px);
+        }
+        
+        .shape-3 {
+            top: 40%;
+            right: 10%;
+            width: 150px;
+            height: 150px;
+            background-color: var(--secondary-color);
+            filter: blur(80px);
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+            .hero {
+                flex-direction: column;
+                height: auto;
+                min-height: 100vh;
+            }
+            
+            .hero-content {
+                width: 100%;
+                padding: 4rem 2rem;
+                text-align: center;
+                align-items: center;
+            }
+            
+            .hero-content h1 {
+                font-size: 3.5rem;
+            }
+            
+            .hero-content p {
+                font-size: 1.3rem;
+                max-width: 100%;
+            }
+            
+            #canvas-container {
+                position: relative;
+                width: 100%;
+                height: 50vh;
+            }
+            
+            .hero-content:after {
+                display: none; /* Remove overlay gradient on mobile */
+            }
+            
+            .content {
+                padding: 4rem 2rem;
+            }
+            
+            .content h2 {
+                font-size: 2.5rem;
+                text-align: center;
+            }
+            
+            .content h2:after {
+                left: 30%;
+                width: 40%;
+            }
+            
+            .content p {
+                text-align: center;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            
+            .shape-1, .shape-2, .shape-3 {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+        
+        <div class="hero-content">
+            <h1 id="hero-title">Welcome to my Portfolio</h1>
+            <p id="hero-subtitle">Scroll down to see more</p>
+        </div>
+        <div id="canvas-container">
+            <div class="loading-overlay" id="loading-overlay">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Loading 3D model...</div>
+            </div>
+        </div>
+        <div class="scroll-indicator">
+            <span>Scroll Down</span>
+            <i class="fas fa-chevron-down scroll-icon"></i>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-bar-fill" id="progress-bar-fill"></div>
+        </div>
+    </div>
+    
+    <div class="content">
+        <div class="content-inner">
+            <h2>Welcome to my website</h2>
+            <p>This is a demonstration of a 3D model that rotates as you scroll. The model starts facing to the side and rotates to face forward as you scroll down. If you scroll back up, the bust will rotate back to its original position.</p>
+            <p>This creates an engaging and interactive experience that draws attention to the detailed 3D model.</p>
+            <p>Once the rotation is complete, scrolling continues normally to reveal the rest of the content.</p>
+        </div>
+    </div>
+    
+    <script>
+        // Set up Three.js scene
+        const canvasContainer = document.getElementById('canvas-container');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const progressBarFill = document.getElementById('progress-bar-fill');
+        
+        const scene = new THREE.Scene();
+        // Set the background to a slightly lighter color to improve contrast
+        scene.background = new THREE.Color(0x16171f);
+        
+        // Camera setup
+        const camera = new THREE.PerspectiveCamera(50, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 1000);
+        // Camera position adjustment for the even larger model
+        camera.position.z = 150; // Further increased camera distance
+        
+        // Renderer setup - enhanced for EEVEE-like appearance
+        const renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            alpha: true,
+            preserveDrawingBuffer: true
+        });
+        renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        // Add EEVEE-like tone mapping
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;  // Similar to EEVEE's filmic
+        renderer.toneMappingExposure = 1.2;                 // Brighter like EEVEE
+        renderer.outputEncoding = THREE.sRGBEncoding;       // Proper color space
+        
+        // Enable physically correct lighting (more like EEVEE)
+        renderer.physicallyCorrectLights = true;
+        
+        canvasContainer.appendChild(renderer.domElement);
+        
+        // MODIFIED: EEVEE-like lighting setup that's bright and neutral
+        // Strong ambient light for overall brightness (similar to EEVEE's default ambient)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+        scene.add(ambientLight);
+        
+        // Main key light - strong and neutral white
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        keyLight.position.set(1, 1, 2);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 1024;
+        keyLight.shadow.mapSize.height = 1024;
+        scene.add(keyLight);
+        
+        // Fill light from opposite side
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        fillLight.position.set(-1, 0.5, 1);
+        scene.add(fillLight);
+        
+        // Top light for better definition (similar to EEVEE's studio setup)
+        const topLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        topLight.position.set(0, 3, 0);
+        scene.add(topLight);
+        
+        // Soft light from behind for rim definition
+        const rimLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        rimLight.position.set(0, 0, -2);
+        scene.add(rimLight);
+        
+        // Create a placeholder for the 3D model
+        let bustModel = null;
+        
+        // Rotation control variables
+        let startY = -Math.PI / -1; // -90 degrees (different side view)
+        let endY = 0.7; // 0 degrees (front view)
+        let rotationProgress = 0; // Start at 0 (side view)
+        let rotationComplete = false;
+        
+        // Text animation variables
+        const originalTitle = "Welcome to my Portfolio";
+        const originalSubtitle = "Scroll down to see all of my projects and designs";
+        const newTitle = "I'm staring straight into your soul...";
+        const newSubtitle = "Enjoy your stay! and ";
+        const textRemovalThreshold = 0.5; // First 50% of rotation for text removal
+        let currentTextProgress = 0;
+        
+        // Smooth scrolling variables
+        let currentScrollY = 0;
+        let targetScrollY = 0;
+        let scrollVelocity = 0;
+        const scrollEase = 0.1; // Adjust for smoother/faster scrolling
+        const scrollDamping = 0.9; // Momentum damping (higher = less damping)
+        const scrollAmount = 100; // Fixed scroll amount per wheel event
+        
+        // Scroll buffer variables
+        let scrollInputsAfterRotation = 0;
+        const scrollBufferThreshold = 3; // Buffer of 3 scroll inputs after rotation completes
+        
+        // Progress bar transition speed (match to model smoothness)
+        progressBarFill.style.transition = 'width 0.25s ease-out';
+        
+        // Elements for text animation
+        const heroTitle = document.getElementById('hero-title');
+        const heroSubtitle = document.getElementById('hero-subtitle');
+        
+        // Function to update text based on rotation progress
+        function updateTextAnimation(progress) {
+            // During first 50% of rotation (text removal phase)
+            if (progress <= textRemovalThreshold) {
+                // Map 0-0.5 rotation progress to 1-0 text visibility
+                const removalProgress = 1 - (progress / textRemovalThreshold);
+                // Calculate characters to show
+                const titleCharsToShow = Math.ceil(originalTitle.length * removalProgress);
+                const subtitleCharsToShow = Math.ceil(originalSubtitle.length * removalProgress);
+                
+                // Update text content
+                heroTitle.textContent = originalTitle.substring(0, titleCharsToShow);
+                heroSubtitle.textContent = originalSubtitle.substring(0, subtitleCharsToShow);
+                
+                // Clear new text area during removal phase
+                currentTextProgress = 0;
+            } 
+            // During remaining 50% of rotation (text reveal phase)
+            else {
+                // Clear old text completely if we're just starting the second phase
+                if (progress === textRemovalThreshold) {
+                    heroTitle.textContent = "";
+                    heroSubtitle.textContent = "";
+                }
+                
+                // Map 0.5-1 rotation progress to 0-1 text reveal progress
+                const revealProgress = (progress - textRemovalThreshold) / (1 - textRemovalThreshold);
+                
+                // Calculate characters to show for new text
+                const newTitleCharsToShow = Math.ceil(newTitle.length * revealProgress);
+                const newSubtitleCharsToShow = Math.ceil(newSubtitle.length * revealProgress * 0.8); // Slightly delay subtitle
+                
+                // Update the title and subtitle with the new text
+                heroTitle.textContent = newTitle.substring(0, newTitleCharsToShow);
+                
+                // Only start showing subtitle after we've shown some of the title (20% of reveal progress)
+                if (revealProgress > 0.2) {
+                    heroSubtitle.textContent = newSubtitle.substring(0, newSubtitleCharsToShow);
+                } else {
+                    heroSubtitle.textContent = "";
+                }
+                
+                currentTextProgress = revealProgress;
+            }
+        }
+        
+        // Hard-coded path to your GLB file - REPLACE THIS WITH YOUR ACTUAL PATH
+        const modelPath = 'model.glb';  // This assumes the GLB file is in the same folder as this HTML file
+        
+        // ADDED: Enhanced material adjustment function for EEVEE-like appearance
+        function enhanceMaterials() {
+            if (bustModel) {
+                bustModel.traverse(function(child) {
+                    if (child.isMesh && child.material) {
+                        const processMaterial = (material) => {
+                            // Increase brightness and reduce contrast
+                            if (material.color) {
+                                // Brighten the color slightly (EEVEE tends to render brighter)
+                                material.color.r = Math.min(1.0, material.color.r * 1.2);
+                                material.color.g = Math.min(1.0, material.color.g * 1.2);
+                                material.color.b = Math.min(1.0, material.color.b * 1.2);
+                            }
+                            
+                            // Reduce metalness if present (EEVEE metals tend to look less reflective than PBR)
+                            if (material.metalness !== undefined) {
+                                material.metalness *= 0.8;
+                            }
+                            
+                            // Increase roughness slightly (EEVEE materials often look less "shiny")
+                            if (material.roughness !== undefined) {
+                                material.roughness = Math.min(1.0, material.roughness * 1.3);
+                            }
+                            
+                            // Subtle desaturation (EEVEE tends to be slightly less saturated than Cycles)
+                            if (material.color) {
+                                const r = material.color.r;
+                                const g = material.color.g;
+                                const b = material.color.b;
+                                
+                                // Calculate grayscale value (luminance)
+                                const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                                
+                                // 10% desaturation - very subtle
+                                material.color.r = r * 0.9 + gray * 0.1;
+                                material.color.g = g * 0.9 + gray * 0.1;
+                                material.color.b = b * 0.9 + gray * 0.1;
+                            }
+                        };
+                        
+                        // Process either an array of materials or a single material
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach(mat => processMaterial(mat));
+                        } else {
+                            processMaterial(child.material);
+                        }
+                    }
+                });
+            }
+        }
+        
+        // Function to load the model from the hard-coded path
+        function loadModel() {
+            const loader = new THREE.GLTFLoader();
+            
+            loader.load(
+                modelPath,
+                (gltf) => {
+                    const model = gltf.scene;
+                    
+                    // Scale the model EVEN larger
+                    model.scale.set(200.0, 200.0, 200.0);
+                    
+                    // Center the model (keep this after material preservation)
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    model.position.x = -center.x;
+                    model.position.y = -center.y + 0; // Offset to raise the model
+                    model.position.z = -center.z - 30; // Offset to bring model closer
+                    
+                    // Always preserve original materials and don't modify them
+                    // This ensures the baked colors in the GLB file are displayed properly
+                    model.traverse(function(child) {
+                        if (child.isMesh) {
+                            // Keep the original materials
+                            if (child.material.map) {
+                                child.material.map.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                            }
+                        }
+                    });
+                    
+                    // Initial rotation - facing to the side
+                    model.rotation.y = startY;
+                    
+                    // Remove any existing model
+                    if (bustModel) {
+                        scene.remove(bustModel);
+                    }
+                    
+                    bustModel = model;
+                    scene.add(bustModel);
+                    
+                    // ADDED: Call the material enhancement function after adding the model
+                    enhanceMaterials();
+                    
+                    // Hide loading overlay
+                    loadingOverlay.style.display = 'none';
+                },
+                (xhr) => {
+                    // Loading progress
+                    if (xhr.lengthComputable) {
+                        const percentComplete = xhr.loaded / xhr.total * 100;
+                        document.querySelector('.loading-text').textContent = 
+                            `Loading model: ${Math.round(percentComplete)}%`;
+                    } else {
+                        document.querySelector('.loading-text').textContent = 
+                            `Loading model: ${Math.round(xhr.loaded / 1024)} KB`;
+                    }
+                },
+                (error) => {
+                    console.error('Error loading model:', error);
+                    
+                    // Show error message
+                    loadingOverlay.innerHTML = `
+                        <div class="error-message">
+                            <p>Error loading 3D model from path: ${modelPath}</p>
+                            <p>Please check if the file exists and the path is correct.</p>
+                            <p>Error details: ${error.message}</p>
+                        </div>
+                    `;
+                    
+                    // Add fallback placeholder model
+                    addPlaceholderModel();
+                    
+                    // Hide error after 3 seconds
+                    setTimeout(() => {
+                        loadingOverlay.style.display = 'none';
+                    }, 3000);
+                }
+            );
+        }
+        
+        // Function to add a placeholder model if loading fails
+        function addPlaceholderModel() {
+            // Create a simple head shape
+            const headGroup = new THREE.Group();
+            
+            // MODIFIED: Head material with more muted, less saturated color
+            const headMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0xe0d0c0,  // Even less saturated, more natural skin tone
+                shininess: 10      // Less shine
+            });
+            
+            // Head - use an ellipsoid shape (slightly elongated sphere)
+            const headGeometry = new THREE.SphereGeometry(1, 32, 32);
+            headGeometry.scale(0.8, 1, 0.9);
+            const head = new THREE.Mesh(headGeometry, headMaterial);
+            head.receiveShadow = true;
+            head.castShadow = true;
+            headGroup.add(head);
+            
+            // Scale the placeholder model even larger
+            headGroup.scale.set(50, 50, 50);
+            
+            // Position adjustments to center properly
+            headGroup.position.y += 20;
+            headGroup.position.z -= 30;
+            
+            // Eyes
+            const eyeGeometry = new THREE.SphereGeometry(0.12, 16, 16);
+            const eyeMaterial = new THREE.MeshPhongMaterial({ color: 0x222222 });
+            
+            const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            leftEye.position.set(-0.3, 0.3, 0.85);
+            headGroup.add(leftEye);
+            
+            const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            rightEye.position.set(0.3, 0.3, 0.85);
+            headGroup.add(rightEye);
+            
+            // Nose
+            const noseGeometry = new THREE.ConeGeometry(0.15, 0.3, 20);
+            const noseMaterial = new THREE.MeshPhongMaterial({ color: 0xe1c0a0 }); // Less saturated nose color
+            const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+            nose.position.set(0, 0.1, 0.9);
+            nose.rotation.x = Math.PI / 2;
+            headGroup.add(nose);
+            
+            // Mouth
+            const mouthGeometry = new THREE.BoxGeometry(0.5, 0.08, 0.1);
+            const mouthMaterial = new THREE.MeshPhongMaterial({ color: 0x804040 }); // Less saturated mouth color
+            const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
+            mouth.position.set(0, -0.2, 0.9);
+            headGroup.add(mouth);
+            
+            // Initial rotation - facing to the side
+            headGroup.rotation.y = startY;
+            
+            bustModel = headGroup;
+            scene.add(bustModel);
+            
+            // Apply material enhancements to the placeholder as well
+            enhanceMaterials();
+        }
+        
+        // Load the model immediately when the page loads
+        loadModel();
+        
+        // Initialize text (in case there's any initial rotation progress)
+        updateTextAnimation(rotationProgress);
+        
+        // Set a timeout to add a placeholder if model doesn't load in 10 seconds
+        const placeholderTimeout = setTimeout(() => {
+            if (!bustModel) {
+                console.log('Model load timeout - using placeholder');
+                addPlaceholderModel();
+                
+                // Update loading overlay
+                loadingOverlay.innerHTML = `
+                    <div class="error-message">
+                        <p>Timed out waiting for model to load from path: ${modelPath}</p>
+                        <p>Using placeholder model instead.</p>
+                    </div>
+                `;
+                
+                // Hide error after 3 seconds
+                setTimeout(() => {
+                    loadingOverlay.style.display = 'none';
+                }, 3000);
+            }
+        }, 10000);
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = canvasContainer.clientWidth / canvasContainer.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+        });
+        
+        // Improved variables for smoother model rotation
+        let currentRotationY = startY;
+        let targetRotationY = startY;
+        const rotationEase = 0.15;  // Controls rotation smoothness (higher = faster)
+        
+        // Smooth animation function that handles both model rotation and smooth scrolling
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Update model rotation with improved smoothness
+            if (bustModel) {
+                // Calculate target rotation based on progress
+                targetRotationY = startY - (startY - endY) * rotationProgress;
+                
+                // Smooth interpolation for rotation
+                currentRotationY += (targetRotationY - currentRotationY) * rotationEase;
+                
+                // Apply the smoothed rotation
+                bustModel.rotation.y = currentRotationY;
+            }
+            
+            // Smooth scrolling with momentum
+            if (Math.abs(currentScrollY - targetScrollY) > 0.1) {
+                // Apply easing
+                currentScrollY += (targetScrollY - currentScrollY) * scrollEase + scrollVelocity;
+                scrollVelocity *= scrollDamping;
+                
+                // Clamp to prevent overshooting
+                if ((scrollVelocity > 0 && currentScrollY > targetScrollY) || 
+                    (scrollVelocity < 0 && currentScrollY < targetScrollY)) {
+                    currentScrollY = targetScrollY;
+                    scrollVelocity = 0;
+                }
+                
+                // Apply the scroll position
+                window.scrollTo(0, currentScrollY);
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Start animation
+        animate();
+        
+        // Intercept wheel events to control rotation and scrolling
+        window.addEventListener('wheel', (event) => {
+            // Only handle wheel events if model is loaded
+            if (!bustModel) return;
+            
+            // Determine scroll direction
+            const wheelDelta = event.deltaY;
+            const scrollDirection = Math.sign(wheelDelta); // 1 for down, -1 for up
+            
+            // Current document scroll position
+            const currentScrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+            
+            // Prevent default to handle smooth scrolling ourselves
+            event.preventDefault();
+            
+            // Calculate rotation completion based on scroll direction and current progress
+            if (!rotationComplete) {
+                // Adjust progress with a consistent amount per scroll - INCREASED FOR FASTER ROTATION
+                rotationProgress += scrollDirection * 0.25; // Increased from 0.1 to 0.25
+                
+                // Clamp rotation progress between 0 and 1
+                rotationProgress = Math.max(0, Math.min(1, rotationProgress));
+                
+                // Update progress bar and text animation
+                progressBarFill.style.width = `${rotationProgress * 100}%`;
+                updateTextAnimation(rotationProgress);
+                
+                // Check if rotation has completed
+                if (rotationProgress >= 1 && scrollDirection > 0) {
+                    rotationComplete = true;
+                    scrollInputsAfterRotation = 0;
+                    // Don't start scrolling yet - buffer starts now
+                }
+                // If we're at the top and scrolling back up, reset rotation complete
+                else if (currentScrollPosition <= 0 && rotationProgress <= 0 && scrollDirection < 0) {
+                    rotationComplete = false;
+                }
+            } 
+            // Handle normal scrolling when rotation is complete
+            else {
+                if (currentScrollPosition <= 0 && scrollDirection < 0) {
+                    // At the top of the page and scrolling up - transition back to rotation mode
+                    rotationComplete = false;
+                    scrollInputsAfterRotation = 0;
+                    rotationProgress = Math.max(0, rotationProgress + scrollDirection * 0.1);
+                    progressBarFill.style.width = `${rotationProgress * 100}%`;
+                    updateTextAnimation(rotationProgress);
+                } else {
+                    // Increment the scroll buffer counter
+                    scrollInputsAfterRotation++;
+                    
+                    // Only start actual scrolling after buffer threshold is reached
+                    if (scrollInputsAfterRotation > scrollBufferThreshold) {
+                        // Normal scrolling with momentum
+                        targetScrollY += scrollDirection * scrollAmount;
+                        // Ensure we don't scroll past the top
+                        targetScrollY = Math.max(0, targetScrollY);
+                        // Add velocity for momentum effect
+                        scrollVelocity += scrollDirection * 2;
+                    }
+                }
+            }
+            
+            // Sync currentScrollY with actual page position if they drift apart
+            if (Math.abs(currentScrollY - currentScrollPosition) > 50) {
+                currentScrollY = currentScrollPosition;
+            }
+        }, { passive: false });
+        
+        // Handle touch events for mobile devices
+        let touchStartY = 0;
+        let lastTouchY = 0;
+        let touchVelocity = 0;
+        
+        window.addEventListener('touchstart', (event) => {
+            touchStartY = event.touches[0].clientY;
+            lastTouchY = touchStartY;
+            touchVelocity = 0;
+            
+            // Clear any ongoing momentum scrolling
+            scrollVelocity = 0;
+        }, { passive: false });
+        
+        window.addEventListener('touchmove', (event) => {
+            // Only handle touch events if model is loaded
+            if (!bustModel) return;
+            
+            const currentTouchY = event.touches[0].clientY;
+            const touchDelta = lastTouchY - currentTouchY;
+            const touchDirection = Math.sign(touchDelta);
+            
+            // Calculate touch velocity for momentum
+            touchVelocity = touchDelta;
+            
+            // Current document scroll position
+            const currentScrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+            
+            if (!rotationComplete) {
+                // Prevent default scrolling during rotation phase
+                event.preventDefault();
+                
+                // Adjust progress based on touch movement - INCREASED FOR FASTER ROTATION
+                rotationProgress += touchDirection * Math.abs(touchDelta) * 0.008;
+                
+                // Clamp rotation progress between 0 and 1
+                rotationProgress = Math.max(0, Math.min(1, rotationProgress));
+                
+                // Update progress bar and text animation
+                progressBarFill.style.width = `${rotationProgress * 100}%`;
+                updateTextAnimation(rotationProgress);
+                
+                // Check if rotation has completed
+                if (rotationProgress >= 1 && touchDirection > 0) {
+                    rotationComplete = true;
+                    scrollInputsAfterRotation = 0;
+                }
+            } else {
+                if (currentScrollPosition <= 0 && touchDirection < 0) {
+                    // At the top of the page and swiping up - transition back to rotation mode
+                    event.preventDefault();
+                    rotationComplete = false;
+                    rotationProgress = Math.max(0, rotationProgress + touchDirection * Math.abs(touchDelta) * 0.008);
+                    progressBarFill.style.width = `${rotationProgress * 100}%`;
+                }
+                // Otherwise, let default touch scrolling happen
+            }
+            
+            lastTouchY = currentTouchY;
+        }, { passive: false });
+        
+        window.addEventListener('touchend', (event) => {
+            // Apply momentum scrolling based on final touch velocity
+            if (rotationComplete && scrollInputsAfterRotation > scrollBufferThreshold) {
+                scrollVelocity = touchVelocity * 0.2;
+                targetScrollY = currentScrollY + Math.sign(touchVelocity) * Math.min(Math.abs(touchVelocity) * 3, 300);
+                targetScrollY = Math.max(0, targetScrollY);
+            }
+        }, { passive: true });
+        
+        // Debug message to help troubleshoot
+        console.log('Three.js version:', THREE.REVISION);
+        console.log('Model path:', modelPath);
+    </script>
+</body>
+</html>
